@@ -1,0 +1,10 @@
+timer 简单定时器 version 0.4
+
+说明：
+0. 一个简单定时器实现，使用pyqt4实现
+1. windows xp/linux python 2.7 下测试通过
+2. 定时器到期时使用beep()和托盘提示两种方式通知用户，发声使用beep(), 暂时没有找到更好的办法，我想做的简单明了
+3. 有bug请告之 wujianhua0924@gmail.com
+
+2013.08.03 by wuxx
+blog.csdn.net/wu5795175
