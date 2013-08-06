@@ -28,7 +28,7 @@ class Game(QtGui.QMainWindow):
 class Board(QtGui.QFrame):
     BoardWidth = 22
     BoardHeight = 10
-    Speed = 125
+    Speed = 110
 
     Free = 0
     Userd = 1
@@ -75,6 +75,8 @@ class Board(QtGui.QFrame):
         else:
             QtGui.QWidget.keyPressEvent(self, event)
 
+    def trySwap(self, labelA, labelB):
+        
     def pause(self):
         if self.isDie == True:
             return 
