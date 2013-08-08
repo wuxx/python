@@ -18,8 +18,7 @@ class Game(QtGui.QMainWindow):
         self.setCentralWidget(self.board)
 
         self.statusbar = self.statusBar()
-        self.connect(self.board, QtCore.SIGNAL("messageToStatusbar(QString)"), self.statusbar, QtCore.SLOT("showMessage(QString)"))
-
+        self.connect(self.board, QtCore.SIGNAL("messageToStatusbar(QString)"), self.statusbar, QtCore.SLOT("showMessage(QString)")) 
     def center(self):
         screen = QtGui.QDesktopWidget().screenGeometry()
         size =  self.geometry()
@@ -56,6 +55,8 @@ class Board(QtGui.QFrame):
         self.timer.start(Board.Speed, self)
 
     def keyPressEvent(self, event):
+        if self.isDie == True:
+            return 
         key = event.key()      
 
         if key == QtCore.Qt.Key_Up:
@@ -75,11 +76,7 @@ class Board(QtGui.QFrame):
         else:
             QtGui.QWidget.keyPressEvent(self, event)
 
-    def trySwap(self, labelA, labelB):
-        
     def pause(self):
-        if self.isDie == True:
-            return 
         if self.isPaused == False:
             self.isPaused = True
             self.timer.stop()
@@ -106,6 +103,8 @@ class Board(QtGui.QFrame):
         """ 根据self.direction更新self.snake_body，并重新画图
         """
         if self.isDie == True:
+            return 
+        if self.isPaused == True:
             return 
         head = self.snake_body[-1]  # 蛇头
 

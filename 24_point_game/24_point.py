@@ -23,7 +23,7 @@ class GameWindow(QtGui.QMainWindow):
         for i in range(0, 4):
             label = QtGui.QLabel()
             label.setAlignment(QtCore.Qt.AlignCenter)
-            num = random.randint(1, 10) [1, 10]
+            num = random.randint(1, 10) #[1, 10]
             self.num.append(num)
             self.num_bak.append(num)
             self.expression.append(str(num))
