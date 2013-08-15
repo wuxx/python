@@ -1,9 +1,9 @@
 game 24_point version 0.8
 说明：
-0. 一个独立砖石智力游戏实现，使用pygame实现
-1. 声音总是有明显的延迟，这个问题没有解决
+0. 一个井字棋游戏实现，使用pygame实现
+1. 核心算法参考自 http://blog.csdn.net/yorhomwang/article/details/8652567
 2. windows xp/linux python 2.7 下测试通过
 3. 有bug请告之 wujianhua0924@gmail.com
 
-2013.08.02 by wuxx
+2013.08.13 by wuxx
 http://blog.csdn.net/wu5795175
