@@ -4,9 +4,12 @@
 import sys
 import socket
 import thread
+import select
 from PyQt4 import QtGui,QtCore
 from math import *
 
+reload(sys)
+sys.setdefaultencoding('utf-8')
 NONE = 0
 SERVER = 1
 CLIENT = 2
@@ -27,16 +30,27 @@ class ChatWindow(QtGui.QMainWindow):
         self.widget = QtGui.QWidget(self)
         self.setCentralWidget(self.widget)
         self.setWindow()
-        self.initChat()
+        self.server_sock_inited = False
+        self.state = DISCONNECTED
 
-    def initChat(self):
+    def initChat(self, mode):
         self.state = DISCONNECTED
-        self.mode = NONE
-        self.state = DISCONNECTED
+        self.mode = mode
         self.port = PORT
         self.sendbuf = ''
 
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        self.sendbuflock = thread.allocate_lock() 
+        if mode == SERVER:
+            if self.server_sock_inited == False:
+                self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.server_sock.bind(('0.0.0.0', self.port))
+                self.server_sock.listen(5)
+                self.server_sock_inited = True
+        elif mode == CLIENT:
+            self.client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
 
     def setWindow(self):
         self.textwindow = QtGui.QTextEdit()
@@ -47,6 +61,7 @@ class ChatWindow(QtGui.QMainWindow):
 
         self.sendbtn = QtGui.QPushButton('send', self)
         self.sendbtn.setDefault(True)
+        self.sendbtn.setShortcut('Ctrl+S')
         self.connect(self.sendbtn, QtCore.SIGNAL('clicked()'), self.send)
 
         self.statusbar = self.statusBar()
@@ -74,25 +89,21 @@ class ChatWindow(QtGui.QMainWindow):
         hbox.addStretch(1)
         hbox.addWidget(self.sendbtn)
 
-        vbox = QtGui.QVBoxLayout()
-        vbox.addWidget(self.textwindow)
-        vbox.addWidget(self.sendtext)
-        vbox.addLayout(hbox)
+        gbox = QtGui.QGridLayout()
+        gbox.addWidget(self.textwindow, 0, 0)
+        gbox.addWidget(self.sendtext, 1, 0)
+        gbox.addLayout(hbox, 2, 0)
 
-        self.widget.setLayout(vbox)
+        gbox.setRowStretch(0, 30)
+        gbox.setRowStretch(1, 10)
+        self.widget.setLayout(gbox)
 
     def server(self):
         print "server selected"
-        #self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "Waiting for client ...")
-        print "emit"
-
-        self.mode = SERVER
+        self.initChat(SERVER)
         self.clientact.setDisabled(True)
         self.serveract.setDisabled(True)
 
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(('localhost', self.port))
-        self.sock.listen(5)
 
         thread.start_new_thread(self.thread, ('server_thread', self.mode))
 
@@ -100,79 +111,140 @@ class ChatWindow(QtGui.QMainWindow):
         print "%s %s running..." %(string, mode)
         if mode == SERVER:
             self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "waiting for client...")
-            self.connection, self.remoteaddress = self.sock.accept()
+            self.connection, self.remoteaddress = self.server_sock.accept()
+            self.connection.setblocking(0)
             self.state = CONNECTED
+            idle = 0
+            self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "client connected")
             while self.state == CONNECTED:
                 print "server running..."
                 try:
-                    self.connection.settimeout(5)  
-                    buf = self.connection.recv(RECV_LIMIT)  
-                    if len(buf) != 0:
-                        print "receive %s" %(buf)
-                        text = ''.join([self.remoteaddress[0], ':', str(self.remoteaddress[1]), '>', buf])
-                        print "text: %s" %(text)
-                        #self.textwindow.append(text)   # 线程中不能使用GUI对象, 只能发射信号
-                        self.emit(QtCore.SIGNAL("messageAppendToTextWindow(QString)"), text)
-                        self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "chatting")
+                    self.sendbuflock.acquire()
+                    if len(self.sendbuf) != 0:
+                        if len(self.sendbuf) > SEND_LIMIT:
+                            self.sendbuf = self.sendbuf[0:SEND_LIMIT]
+                        self.connection.send(str(self.sendbuf))
+                        idle = 0
+                        self.sendbuf = ''
+                    self.sendbuflock.release()
+
+                    buf = ''
+                    rlist, wlist, elist = select.select([self.connection], [], [], 0.5)
+                    if len(rlist) != 0:
+                        buf = self.connection.recv(RECV_LIMIT)  
+                        if len(buf) != 0:
+                            print "receive %s" %(buf)
+                            print "len(buf): %d" %(len(buf))
+                            text = ''.join([str(self.remoteaddress[0]), ':', str(self.remoteaddress[1]), '>', str(buf)])
+                            if text[-1] == '\n':
+                                text = text[0:-1]
+                            print "text: %s" %(text)
+                            print "len(text): %d" %(len(text))
+                            #self.textwindow.append(text)   # 线程中不能使用GUI对象, 只能发射信号
+                            self.emit(QtCore.SIGNAL("messageAppendToTextWindow(QString)"), text)
+                            #test = "吴xx"
+                            #test.encode('utf-8')
+                            #self.emit(QtCore.SIGNAL("messageAppendToTextWindow(QString)"), test)
+                            #self.emit(QtCore.SIGNAL("messageAppendToTextWindow(QString)"), QtCore.QString(u'测试')) # success
+                            self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "chatting")
+                            idle = 0
+                        else:
+                            idle += 1
+                            print "idle: %d" %(idle)
+                            if idle == 240:
+                                print "idle timeout0" 
+                                self.connection.close()
+                                self.reset()
+                                thread.exit_thread()
                     else:
-                        self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "session closed")
-                        self.connection.close() 
-                        #self.sock.close()
-                        self.reset()
-                except socket.timeout:  
-                    print 'except: time out'  
+                        idle += 1
+                        print "idle: %d" %(idle)
+                        if idle == 240:
+                            print "idle timeout" 
+                            self.connection.close()
+                            self.reset()
+                            thread.exit_thread()
+                except socket.error, e:
+                    print "except: other except.. %s" %(e)
                     self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "session closed")
                     self.connection.close() 
-                    #self.sock.close()
                     self.reset()
-                except socket.error, msg:
-                    print "except: other except" %(msg)
-                    self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "session closed")
-                    self.connection.close() 
-                    #self.sock.close()
-                    self.reset()
+                    thread.exit_thread()
 
         elif mode == CLIENT:
             self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "connecting to server...")
             print "client thread running..."
+            idle = 0
 
             try:
-                self.sock.connect((self.serverip, self.port))
-                self.sock.setblocking(0)
+                self.client_sock.connect((self.serverip, self.port))
+                self.client_sock.setblocking(0)    # 此语句要在self.sock.connect之后
                 self.state = CONNECTED
+                self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "connecting to server... success")
                 print "connect successed"
                 while self.state == CONNECTED:
+                    self.sendbuflock.acquire()
                     if len(self.sendbuf) != 0:
-                        print "sendbuf: %s" %(self.sendbuf)
-                        self.sock.send(self.sendbuf)
+                        print "now send the text... sendbuf: %s" %(self.sendbuf)
+                        if len(self.sendbuf) > SEND_LIMIT:
+                            self.sendbuf = self.sendbuf[0:SEND_LIMIT]
+                        self.client_sock.send(str(self.sendbuf))   # 这里必须要用str转换, self.sendbuf是QString类型
+                        idle = 0
+                        print "send the text.... idle: %d" %(idle)
                         self.sendbuf = ''
+                    self.sendbuflock.release()
                     print "recv..."
                     buf = ''
-                    try:
-                        buf = self.sock.recv(RECV_LIMIT)
-                    except socket.error, e:
-                        if e.errno == 11: # Resource temporarily unavailable
-                            print "except: %s" %(e)
+                    rlist, wlist, elist = select.select([self.client_sock], [], [], 0.5)
+                    print "after select..."
+                    print "len(rlist): %d" %(len(rlist))
+                    if len(rlist) != 0:
+                        buf = self.client_sock.recv(RECV_LIMIT)
+                        print "len(buf): %d" %(len(buf))
+                        if len(buf) != 0:
+                            text = ''.join([str(self.serverip), ':', str(self.port), '>', buf])
+                            if text[-1] == '\n':
+                                text = text[0:-1]
+                            print "text: %s" %(text)
+                            self.emit(QtCore.SIGNAL("messageAppendToTextWindow(QString)"), text)
+                            idle = 0
                         else:
-                            print "other except: %s" %(e)
-                    print "recv buf: %s" %(buf)
-                    if len(buf) != 0:
-                        text = ''.join([str(self.serverip), ':', str(self.port), '>', buf])
-                        self.emit(QtCore.SIGNAL("messageAppendToTextWindow(QString)"), text)
+                            idle += 1
+                            print "idle: %d" %(idle)
+                            if idle == 240:
+                                print "timeout..."
+                                self.client_sock.close()
+                                self.reset()
+                                thread.exit_thread()
+                    else:
+                        idle += 1
+                        print "idle: %d" %(idle)
+                        if self.state == DISCONNECTED:
+                            self.client_sock.close()
+                            thread.exit_thread()
+                        if idle == 240:
+                            print "timeout..."
+                            self.client_sock.close()
+                            self.reset()
+                            thread.exit_thread()
+
+                        
             except socket.error, e:
                 print "except: %s" %(e)
                 if e.errno == 111:       # Connection refused
                     self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "connection refused")
-                elif e.errno == 11:    # Resource temporarily unavailable
-                    print "except: %s" %(e)
+                elif e.errno == 10061:
+                    self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "connection refused")
                 else:
+                    print "other except: %s" %(e)
                     self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "connection failed, session closed")
-                    self.reset()
-                
-            print "client mode"
 
+                self.client_sock.closed()
+                self.reset()
+                thread.exit_thread()
+                
         else:
-            print "exiting thread .. "
+            print "unexcept mode: %d exiting thread .. " %(mode)
             thread.exit_thread()
 
         thread.exit_thread()
@@ -181,33 +253,46 @@ class ChatWindow(QtGui.QMainWindow):
 
     def client(self):
         print "client selected"
-        self.mode = CLIENT
-        self.serveract.setDisabled(True)
-        self.clientact.setDisabled(True)
+        self.initChat(CLIENT)
 
         text, ok = QtGui.QInputDialog.getText(self, 'SERVER IP', 'Enter The Server IP:')
         if ok == True:
-            self.serverip = text
-            print "servserip is %s" %(self.serverip)
-            thread.start_new_thread(self.thread, ('client_thread', self.mode))
+            if self.isvalid(text) == True:
+                self.serverip = text
+                print "servserip is %s" %(self.serverip)
+                self.serveract.setDisabled(True)
+                self.clientact.setDisabled(True)
+                thread.start_new_thread(self.thread, ('client_thread', self.mode))
+            else:
+                self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "ip address invalid")
 
     def reset(self):
         print "connection reset"
+        self.state = DISCONNECTED
         self.serveract.setEnabled(True)
         self.clientact.setEnabled(True)
-        self.mode = NONE
-        self.state = DISCONNECTED
-        self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "session closed1")
+        self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "session closed")
 
 
     def send(self):
         print "now send the text %s" %(self.sendtext.toPlainText())
-        sendtext = self.sendtext.toPlainText()
-        self.sendbuf = sendtext
-        if len(sendtext) != 0 and self.state == CONNECTED:
-            self.emit(QtCore.SIGNAL("messageAppendToTextWindow(QString)"), ''.join(['you:', text]))
+        text = self.sendtext.toPlainText()
+        if len(text) != 0 and self.state == CONNECTED:
+            self.sendbuflock.acquire()
+            self.sendbuf = text
+            text = ''.join(['I>', str(self.sendbuf)])
+            self.emit(QtCore.SIGNAL("messageAppendToTextWindow(QString)"), text)
+            self.sendbuflock.release()
+            self.sendtext.setPlainText('')
         else:
+            print "no session existed"
             self.emit(QtCore.SIGNAL("messageToStatusbar(QString)"), "session not started")
+
+    def isvalid(self, ip):
+        if len(ip) == 0:
+            return False
+        else:
+            return len([i for i in ip.split('.') if (0<= int(i)<= 255)])== 4
 
 def startChat():
     app = QtGui.QApplication(sys.argv)
