@@ -2,7 +2,7 @@ game fifteen version 0.8
 说明：
 0. 一个简单的拼图游戏，又叫Game 15, 使用pyqt实现，
 1. windows xp/linux python 2.7 下测试通过
-2. 牌上的数字是随机初始化的，所以有时会出现无解的情况
+2. 牌上的数字是随机初始化的，所以有时会出现无解的情况，这里有无解的证明http://www.math.psu.edu/guysin_m/15/solution.html
 3. 有bug请告之 wujianhua0924@gmail.com
 
 2013.08.06 by wuxx
