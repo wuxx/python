@@ -26,6 +26,8 @@ while end == False:
             point = pygame.mouse.get_pos()
             pos = draw.getpos(point)
             print "get (%d, %d)" %(pos[0], pos[1])
+        else:
+            print "no event"
 
 pygame.quit()
 

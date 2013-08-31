@@ -80,7 +80,7 @@ class draw:
         y = (pos[1] - self.starty - self.margin) // (self.rect_height + self.margin)
         if y >= 0 and y < len(self.map):
             if x >= 0 and x < len(self.map[y]):
-                if math.hypot(self.startx + self.margin + x*self.rect_height + self.rect_height/2 - pos[0], self.starty + self.margin + y*self.rect_height + self.rect_height/2 - pos[1]) <= self.radius:
+                if math.hypot(self.startx + self.margin + x*self.rect_height + self.rect_height/2 - pos[0], self.starty + self.margin + y*(self.rect_height + self.margin) + self.rect_height/2 - pos[1]) <= self.radius:
                     return (x, y)
         return (-1, -1)
         #if x < 0 or x >= self.gridX or y < 0 or y >= self.gridY:
@@ -132,9 +132,7 @@ class draw:
             else:
                 return False    # 没有棋子消除
         else:
-            print "rlist: ", rlist
             for r in rlist:
-                print "remove:", r
                 self.map[r[1]][r[0]] = REMOVED
                 self.drawcircle((r[0], r[1]), white) 
 

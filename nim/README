@@ -1,4 +1,4 @@
-game 24_point version 0.8
+game nim version 0.8
 说明：
 0. 一个nim游戏实现，使用pygame实现
 1. 左键点选，右键消除

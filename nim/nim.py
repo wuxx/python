@@ -48,10 +48,8 @@ while end == False:
         if event.type == pygame.QUIT: end = True
         elif event.type == pygame.MOUSEBUTTONDOWN:
             press_btn = pygame.mouse.get_pressed()
-            print press_btn
             if press_btn[0] == 1:   # 左键
                 point = pygame.mouse.get_pos()
-                print point
                 if pygame.Rect(menu0).collidepoint(point):
                     draw.reset()
                     ai_first = False
@@ -67,27 +65,22 @@ while end == False:
                     draw.remove(remove_list)
                 else:
                     pos = draw.getpos(point)
-                    print "get (%d, %d)" %(pos[0], pos[1])
                     if pos != (-1, -1):
                         if draw.isfree(pos):
                             draw.set(pos)
                         else:
                             draw.unset(pos)
             elif press_btn[2] == 1: # 右键移除棋子
-                print "right mouse" 
                 if draw.remove() == True: #有棋子移除
                     if core.gameover(draw.getmap()) == True:
                         gameover = True
                         setstatusbar('you win!')
-                        print "you win! game over!"
                     else:
                         remove_list = core.caculate(draw.getmap())
-                        print "remove_list: ", remove_list
                         draw.remove(remove_list)
                         if core.gameover(draw.getmap()) == True:
                             gameover = True
                             setstatusbar('ai win!')
-                            print "AI win! game over!"
 
                             
 
