@@ -22,7 +22,7 @@ class core:
                     for x in range(len(map[y])):
                        if map[y][x] == NONE:
                             remove_element.append(x)    # 找出此堆中的石子
-                            count += 1
+                            count += 1                  # 石子个数
                     if (count & (1 << (self.bit(nimsum) - 1))) > 0: # 此句是必胜算法的核心
                         remove_element.reverse()
                         remove_count = count - (count^nimsum)   # 得到移除的石子的个数，这里必须要括号，-的优先级比^的要高
